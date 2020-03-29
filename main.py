@@ -75,12 +75,15 @@ class PyClassInformer(tk.Frame):
 
         # controls
         self.lbl_file = tk.Label(text="No File Selected.")
-        self.scrollbar = tk.Scrollbar(self.root)
-        self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.xscrollbar = tk.Scrollbar(self.root, orient='horizontal')
+        self.yscrollbar = tk.Scrollbar(self.root)
+        self.xscrollbar.pack(side=tk.BOTTOM, fill=tk.X)
+        self.yscrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
         # classlist control
         self.classlist = ClassViewer(self.root,
-                                      yscrollcommand=self.scrollbar.set)
+                                      yscrollcommand=self.yscrollbar.set,
+                                      xscrollcommand=self.xscrollbar.set)
         self.classlist['columns'] = ('#1','#2')
         for col in self.classlist['columns']:
             self.classlist.heading(col, text=col, command=lambda _col=col: \
@@ -89,14 +92,15 @@ class PyClassInformer(tk.Frame):
         self.classlist.heading("#0", text="ID", anchor=tk.W)
         self.classlist.heading("#1", text="VFTable VA", anchor=tk.W)
         self.classlist.heading("#2", text="Class", anchor=tk.W)
-        self.classlist.column("#0", width=35, minwidth=35, stretch=tk.YES)
+        self.classlist.column("#0", width=40, minwidth=35, stretch=tk.YES)
         self.classlist.column("#1", width=150, minwidth=150, stretch=tk.YES)
         self.classlist.column("#2", width=270, minwidth=270, stretch=tk.YES)
 
         # gui style
         self.lbl_file.pack(anchor="w")
         self.classlist.pack(side=tk.TOP, fill=tk.BOTH, expand=1)
-        self.scrollbar.config(command=self.classlist.yview)
+        self.yscrollbar.config(command=self.classlist.yview)
+        self.xscrollbar.config(command=self.classlist.xview)
 
     def loadFile(self):
         self.classlist.delete(*self.classlist.get_children())
@@ -104,7 +108,7 @@ class PyClassInformer(tk.Frame):
             filetypes=(("Executable files", "*.exe"),
                        ("DLL Library", "*.dll"), ("all files", "*.*")))
         if self.file_path == '':
-            print("Error - Invalid file path!")
+            print("Error - Invalid target path!")
             return
         self.lbl_file['text'] = ntpath.basename(self.file_path)
         self.update_idletasks()

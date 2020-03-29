@@ -28,8 +28,8 @@ class RTTIScanner:
 
         if self.mode == 32:
             print("32-bit file loaded")
-            self.ptr_t = s_dword.size
-            self.ptr_c = s_dword
+            self.ptr_t = self.s_dword.size
+            self.ptr_c = self.s_dword
 
         elif self.mode == 64:
             print("64-bit file loaded")
@@ -49,6 +49,18 @@ class RTTIScanner:
             print("ERROR: Data Not Found")
         return None
 
+
+    def find_bytes(self, bytes):
+        index = 1
+        results = []
+        while index != -1:
+            index = self.data.find(bytes, index)
+            if index != -1:
+                results.append(index)
+                index += 1
+        return results
+
+
     def find_pattern(self, pattern, mask):
         patterns_found = []
         for i in range(len(self.data)):
@@ -59,6 +71,17 @@ class RTTIScanner:
                 else:
                     break
         return patterns_found
+
+    def find_references(self, dwValue):
+        results = []
+        dwBytes = self.s_qword.pack(dwValue)
+        index = 1
+        while index != -1:
+            index = self.data.find(dwBytes, index)
+            if index != -1:
+                results.append(index)
+                index += 1
+        return results
 
     def find_first_reference(self, dwValue):
         dwBytes = self.ptr_c.pack(dwValue)
@@ -77,6 +100,8 @@ class RTTIScanner:
             modified_symbol = buffer.value.decode("ASCII")
             modified_symbol = modified_symbol.replace("const ", "")
             modified_symbol = modified_symbol.replace("::`vftable'", "")
+            modified_symbol = modified_symbol.replace("`anonymous namespace'::", "")
+
             return modified_symbol
         else:
             print("UndecorateSymbol failed:\n", symbol)
@@ -121,6 +146,7 @@ class RTTIScanner:
                 self.vftables.append(va_vftable)
 
     def __SCAN32__(self):
+        # fuck this shit it wont work for now
         pass
 
     def scan(self):
