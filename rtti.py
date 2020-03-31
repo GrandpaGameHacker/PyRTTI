@@ -27,12 +27,10 @@ class RTTIScanner:
         self.s_dword = struct.Struct('I')
 
         if self.mode == 32:
-            print("32-bit file loaded")
             self.ptr_t = self.s_dword.size
             self.ptr_c = self.s_dword
 
         elif self.mode == 64:
-            print("64-bit file loaded")
             self.ptr_t = self.s_qword.size
             self.ptr_c = self.s_qword
         self.rtti_found = False
@@ -48,8 +46,7 @@ class RTTIScanner:
             index = index - (self.ptr_t * 2)
             return self.data[index:index + 8]
         else:
-            print("ERROR: Data Not Found")
-        return None
+            return None
 
     def find_bytes(self, bytes):
         index = 1
@@ -105,14 +102,11 @@ class RTTIScanner:
 
             return modified_symbol
         else:
-            print("UndecorateSymbol failed:\n", symbol)
             return symbol
 
     def __SCAN64__(self):
-        print("scanning for type_info...")
         type_vftable_data = self.find_type_vftable()
         if(type_vftable_data == None):
-            print("Does not contain RTTI!")
             return
 
         type_vftable_rva = self.s_qword.unpack(type_vftable_data)[0]
@@ -127,9 +121,7 @@ class RTTIScanner:
             - self.pe.OPTIONAL_HEADER.ImageBase)
 
         type_meta_data = self.data[type_meta_offset:type_meta_offset + 24]
-        print("type data:", type_meta_data)
 
-        print("scanning for CompleteObjectLocator structs...")
         self.objectLocators = self.find_pattern(
             type_meta_data, 'xxxxxxxxxxxx???x???x')
         if len(self.objectLocators) != 0:
@@ -157,10 +149,9 @@ class RTTIScanner:
 
 
     def __SCAN32__(self):
-        print("scanning for type_info...")
+        #NOTE TO SELF - BUGGED, doesnt always work
         type_vftable_data = self.find_type_vftable()
         if(type_vftable_data == None):
-            print("Does not contain RTTI!")
             return
 
         type_vftable_rva = self.s_qword.unpack(type_vftable_data)[0]
@@ -175,8 +166,6 @@ class RTTIScanner:
             - self.pe.OPTIONAL_HEADER.ImageBase)
 
         type_meta_data = self.data[type_meta_offset:type_meta_offset + 24]
-        print("type data:", type_meta_data)
-        # working sig! 00000000 00000000 00000000 ????X??? ????X??? 00000000
 
         specialByte = (type_meta_data[0xe] >> 4) << 4
         specialByte2 = specialByte + 0xF
@@ -186,12 +175,11 @@ class RTTIScanner:
         objectRegex = b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00...[\xf0-\xff]...[\xf0-\xff]\x00\x00\x00\x00'
         objectRegex = objectRegex.replace(b'\xf0', specialByte_str)
         objectRegex = objectRegex.replace(b'\xff', specialByte_str2)
-        
+
         objectDatas = re.findall(objectRegex, self.data)
         for objectData in objectDatas:
             index = self.data.find(objectData)
             self.objectLocators.append(index+1)
-
         if len(self.objectLocators) != 0:
             self.rtti_found = True
 

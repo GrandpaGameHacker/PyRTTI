@@ -2,7 +2,10 @@ import tkinter as tk
 from tkinter import ttk
 from tkinter import filedialog
 import ntpath
+import pefile
+
 import rtti
+import code_reference
 
 class ClassViewer(ttk.Treeview):
     def __init__(self, parent, *args, **kwargs):
@@ -12,8 +15,10 @@ class ClassViewer(ttk.Treeview):
         self.context_menu.add_command(label="Copy Selected", command=self.copy_selected)
         self.context_menu.add_command(label="Find Code References...",
                                       command=self.find_references)
-        self.bind("<Button-3>", self.popup)
 
+        self.bind("<Button-3>", self.popup)
+        self.pe = None
+        self.mode = None
 
     def popup(self, event):
         try:
@@ -21,6 +26,12 @@ class ClassViewer(ttk.Treeview):
         finally:
             self.context_menu.grab_release()
 
+    #this code is illegal dont even
+    def copy_pe_to_classviewer(self, pe, mode):
+        if(type(pe) != pefile.PE):
+            return
+        self.pe = pe
+        self.mode = mode
 
     def to_str(self):
         text = ""
@@ -41,7 +52,20 @@ class ClassViewer(ttk.Treeview):
         self.clipboard_append(text)
 
     def find_references(self):
-        pass
+        if self.pe == None:
+            return
+        item = self.selection()[0]
+        item_values = self.item(item, 'values')
+        vftable_va = item_values[2]
+        scanner = code_reference.ClassRefScanner(self.pe, self.mode)
+        references = scanner.get_class_references(vftable_va)
+        if len(references) != 0:
+            self.clipboard_clear()
+            text = ""
+            for reference in references:
+                text+= hex(reference[0]) + " " + reference[1] + " " + reference[2]
+                text+= " ; " + item_values[3] + "\n"
+            self.clipboard_append(text)
 
     def sort_column(self, tv, col, reverse):
         l = [(tv.set(k, col), k) for k in tv.get_children('')]
@@ -112,13 +136,14 @@ class PyClassInformer(tk.Frame):
             filetypes=(("Executable files", "*.exe"),
                        ("DLL Library", "*.dll"), ("all files", "*.*")))
         if self.file_path == '':
-            print("Error - Invalid target path!")
             return
-        self.lbl_file['text'] = ntpath.basename(self.file_path)
+        self.lbl_file['text'] = "Loading: " + ntpath.basename(self.file_path)
         self.update_idletasks()
         self.scanner = rtti.RTTIScanner(self.file_path)
+        self.classlist.copy_pe_to_classviewer(self.scanner.pe, self.scanner.mode)
         self.scanner.scan()
         if not self.scanner.rtti_found:
+            self.lbl_file['text'] = "Error - No RTTI Found"
             return
         for i in range(len(self.scanner.vftables_va)):
             self.classlist.insert("", i,
@@ -127,11 +152,15 @@ class PyClassInformer(tk.Frame):
                                     self.scanner.vftables_rva[i],
                                     self.scanner.vftables_va[i],
                                     self.scanner.symbols[i]))
+        self.lbl_file['text'] = ntpath.basename(self.file_path)
+        self.lbl_file['text'] += " | " + str(self.scanner.mode) + 'bit'
+        self.lbl_file['text'] += " | ObjectLocators found: " + str(len(self.scanner.objectLocators))
+        self.lbl_file['text'] += " | Classes found: " + str(len(self.scanner.vftables_va))
+
 
     def exportData(self):
         save_file_path = filedialog.asksaveasfilename()
         if save_file_path == None:
-            print("Error - Invalid export path")
             return
         try:
             with open(save_file_path, 'w') as file:
