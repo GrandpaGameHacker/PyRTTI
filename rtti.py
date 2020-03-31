@@ -1,6 +1,6 @@
 import pefile
 import struct
-
+import re
 from ctypes import *
 
 from ctypes.wintypes import *
@@ -35,10 +35,12 @@ class RTTIScanner:
             print("64-bit file loaded")
             self.ptr_t = self.s_qword.size
             self.ptr_c = self.s_qword
-
+        self.rtti_found = False
         self.symbols = list()
+        self.vftables_va = list()
+        self.vftables_rva = list()
+        self.vftables_offset = list()
         self.objectLocators = list()
-        self.vftables = list()
 
     def find_type_vftable(self):
         index = self.data.find(b'.?AVtype_info@@')
@@ -48,7 +50,6 @@ class RTTIScanner:
         else:
             print("ERROR: Data Not Found")
         return None
-
 
     def find_bytes(self, bytes):
         index = 1
@@ -60,12 +61,11 @@ class RTTIScanner:
                 index += 1
         return results
 
-
     def find_pattern(self, pattern, mask):
         patterns_found = []
         for i in range(len(self.data)):
             for x in range(len(mask)):
-                if (self.data[i + x] == pattern[x]) or (mask[x] == 0x3F):
+                if (self.data[i + x] == pattern[x]) or (mask[x] == '?'):
                     if x == len(mask) - 1:
                         patterns_found.append(i)
                 else:
@@ -100,7 +100,8 @@ class RTTIScanner:
             modified_symbol = buffer.value.decode("ASCII")
             modified_symbol = modified_symbol.replace("const ", "")
             modified_symbol = modified_symbol.replace("::`vftable'", "")
-            modified_symbol = modified_symbol.replace("`anonymous namespace'::", "")
+            modified_symbol = modified_symbol.replace(
+                "`anonymous namespace'::", "")
 
             return modified_symbol
         else:
@@ -109,7 +110,12 @@ class RTTIScanner:
 
     def __SCAN64__(self):
         print("scanning for type_info...")
-        type_vftable_rva = self.s_qword.unpack(self.find_type_vftable())[0]
+        type_vftable_data = self.find_type_vftable()
+        if(type_vftable_data == None):
+            print("Does not contain RTTI!")
+            return
+
+        type_vftable_rva = self.s_qword.unpack(type_vftable_data)[0]
         type_vftable_rva = type_vftable_rva - self.pe.OPTIONAL_HEADER.ImageBase
         type_vftable_offset = self.pe.get_offset_from_rva(type_vftable_rva)
 
@@ -125,8 +131,9 @@ class RTTIScanner:
 
         print("scanning for CompleteObjectLocator structs...")
         self.objectLocators = self.find_pattern(
-            type_meta_data, b'xxxxxxxxxxxx???x???x')
-
+            type_meta_data, 'xxxxxxxxxxxx???x???x')
+        if len(self.objectLocators) != 0:
+            self.rtti_found = True
         for objectLocator in self.objectLocators:
             sig, offset, cdOffset, pTypeDescriptorRVA, pClassDescriptorRVA = \
                 CompleteObjectLocator.unpack(
@@ -137,18 +144,74 @@ class RTTIScanner:
             meta_vftable = self.find_first_reference(objectLocatorVA)
             if(meta_vftable != None):
                 vftable = meta_vftable + self.ptr_t
-                va_vftable = self.pe.OPTIONAL_HEADER.ImageBase + \
-                    self.pe.get_rva_from_offset(vftable)
+                rva_vftable = self.pe.get_rva_from_offset(vftable)
+                va_vftable = self.pe.OPTIONAL_HEADER.ImageBase + rva_vftable
+                    
                 symbol = self.pe.get_string_at_rva(
                     pTypeDescriptorRVA + self.ptr_t * 2)
                 symbol = self.UndecorateSymbol(symbol)
                 self.symbols.append(symbol)
-                self.vftables.append(va_vftable)
+                self.vftables_offset.append(hex(vftable))
+                self.vftables_rva.append(hex(rva_vftable))
+                self.vftables_va.append(hex(va_vftable))
+
 
     def __SCAN32__(self):
-        # fuck this shit it wont work for now
-        pass
+        print("scanning for type_info...")
+        type_vftable_data = self.find_type_vftable()
+        if(type_vftable_data == None):
+            print("Does not contain RTTI!")
+            return
 
+        type_vftable_rva = self.s_qword.unpack(type_vftable_data)[0]
+        type_vftable_rva = type_vftable_rva - self.pe.OPTIONAL_HEADER.ImageBase
+        type_vftable_offset = self.pe.get_offset_from_rva(type_vftable_rva)
+
+        type_meta_offset = type_vftable_offset - self.ptr_t
+        type_meta_offset_data = \
+            self.data[type_meta_offset:type_meta_offset + self.ptr_t]
+        type_meta_offset = self.pe.get_offset_from_rva(
+            self.ptr_c.unpack(type_meta_offset_data)[0]
+            - self.pe.OPTIONAL_HEADER.ImageBase)
+
+        type_meta_data = self.data[type_meta_offset:type_meta_offset + 24]
+        print("type data:", type_meta_data)
+        # working sig! 00000000 00000000 00000000 ????X??? ????X??? 00000000
+
+        specialByte = (type_meta_data[0xe] >> 4) << 4
+        specialByte2 = specialByte + 0xF
+        specialByte_str = specialByte.to_bytes(1, 'little')
+        specialByte_str2 = specialByte2.to_bytes(1, 'little')
+        
+        objectRegex = b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00...[\xf0-\xff]...[\xf0-\xff]\x00\x00\x00\x00'
+        objectRegex = objectRegex.replace(b'\xf0', specialByte_str)
+        objectRegex = objectRegex.replace(b'\xff', specialByte_str2)
+        
+        objectDatas = re.findall(objectRegex, self.data)
+        for objectData in objectDatas:
+            index = self.data.find(objectData)
+            self.objectLocators.append(index+1)
+
+        if len(self.objectLocators) != 0:
+            self.rtti_found = True
+
+        for objectLocator in self.objectLocators:
+            sig, offset, cdOffset, pTypeDescriptorVA, pClassDescriptorVA = \
+                CompleteObjectLocator.unpack(
+                    self.data[objectLocator:objectLocator + CompleteObjectLocator.size])
+            objectLocatorVA = self.pe.get_rva_from_offset(objectLocator) + self.pe.OPTIONAL_HEADER.ImageBase
+            meta_vftable = self.find_first_reference(objectLocatorVA)
+            if(meta_vftable != None):
+                vftable = meta_vftable + self.ptr_t
+                rva_vftable = self.pe.get_rva_from_offset(vftable)
+                va_vftable = self.pe.OPTIONAL_HEADER.ImageBase + rva_vftable
+                symbol = self.pe.get_string_at_rva(pTypeDescriptorVA - self.pe.OPTIONAL_HEADER.ImageBase + self.ptr_t * 2)
+                symbol = self.UndecorateSymbol(symbol)
+                self.symbols.append(symbol)
+                self.vftables_offset.append(hex(vftable))
+                self.vftables_rva.append(hex(rva_vftable))
+                self.vftables_va.append(hex(va_vftable))
+#2BF540
     def scan(self):
         if self.mode == 32:
             self.__SCAN32__()

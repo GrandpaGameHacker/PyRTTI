@@ -62,7 +62,7 @@ class PyClassInformer(tk.Frame):
         super(PyClassInformer, self).__init__()
         self.root = root
         self.root.title("PyClassInformer")
-        self.root.geometry("400x300")
+        self.root.geometry("800x400")
         self.mainloop = self.root.mainloop
 
         # menu
@@ -84,17 +84,21 @@ class PyClassInformer(tk.Frame):
         self.classlist = ClassViewer(self.root,
                                       yscrollcommand=self.yscrollbar.set,
                                       xscrollcommand=self.xscrollbar.set)
-        self.classlist['columns'] = ('#1','#2')
+        self.classlist['columns'] = ('#1','#2','#3','#4')
         for col in self.classlist['columns']:
             self.classlist.heading(col, text=col, command=lambda _col=col: \
                      self.classlist.sort_column(self.classlist, _col, True))
 
         self.classlist.heading("#0", text="ID", anchor=tk.W)
-        self.classlist.heading("#1", text="VFTable VA", anchor=tk.W)
-        self.classlist.heading("#2", text="Class", anchor=tk.W)
+        self.classlist.heading("#1", text="VFTable Offset", anchor=tk.W)
+        self.classlist.heading("#2", text="VFTable RVA", anchor=tk.W)
+        self.classlist.heading("#3", text="VFTable VA", anchor=tk.W)
+        self.classlist.heading("#4", text="Class", anchor=tk.W)
         self.classlist.column("#0", width=40, minwidth=35, stretch=tk.YES)
-        self.classlist.column("#1", width=150, minwidth=150, stretch=tk.YES)
-        self.classlist.column("#2", width=270, minwidth=270, stretch=tk.YES)
+        self.classlist.column("#1", width=90, minwidth=90, stretch=tk.YES)
+        self.classlist.column("#2", width=100, minwidth=100, stretch=tk.YES)
+        self.classlist.column("#3", width=100, minwidth=100, stretch=tk.YES)
+        self.classlist.column("#4", width=270, minwidth=270, stretch=tk.YES)
 
         # gui style
         self.lbl_file.pack(anchor="w")
@@ -114,10 +118,15 @@ class PyClassInformer(tk.Frame):
         self.update_idletasks()
         self.scanner = rtti.RTTIScanner(self.file_path)
         self.scanner.scan()
-        for i in range(len(self.scanner.vftables)):
+        if not self.scanner.rtti_found:
+            return
+        for i in range(len(self.scanner.vftables_va)):
             self.classlist.insert("", i,
                                   text=str(i),
-                                  values=(hex(self.scanner.vftables[i]),self.scanner.symbols[i].replace(" ", "\ ")))
+                                  values=(self.scanner.vftables_offset[i],
+                                    self.scanner.vftables_rva[i],
+                                    self.scanner.vftables_va[i],
+                                    self.scanner.symbols[i]))
 
     def exportData(self):
         save_file_path = filedialog.asksaveasfilename()
