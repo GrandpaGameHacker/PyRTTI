@@ -157,6 +157,7 @@ class PyClassInformer(tk.Frame):
                                           self.scanner.vftables_rva[i],
                                           self.scanner.vftables_va[i],
                                           self.scanner.symbols[i]))
+        
         self.lbl_file['text'] = ntpath.basename(self.file_path)
         self.lbl_file['text'] += " | " + str(self.scanner.mode) + 'bit'
         self.lbl_file['text'] += " | ObjectLocators found: " + \

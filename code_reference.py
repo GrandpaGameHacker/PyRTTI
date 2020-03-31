@@ -70,9 +70,9 @@ class ClassRefScanner:
 
     def get_class_references(self, vftable_va):
         if self.mode == 32:
-            return get_references_32(vftable_va)
+            return self.get_references_32(vftable_va)
         elif self.mode == 64:
-            return get_references_64(vftable_va)
+            return self.get_references_64(vftable_va)
 
 
         print("found", len(references), "references")
