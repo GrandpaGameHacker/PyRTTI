@@ -7,12 +7,14 @@ import pefile
 import rtti
 import code_reference
 
+
 class ClassViewer(ttk.Treeview):
     def __init__(self, parent, *args, **kwargs):
         ttk.Treeview.__init__(self, parent, *args, **kwargs)
 
         self.context_menu = tk.Menu(self, tearoff=0)
-        self.context_menu.add_command(label="Copy Selected", command=self.copy_selected)
+        self.context_menu.add_command(
+            label="Copy Selected", command=self.copy_selected)
         self.context_menu.add_command(label="Find Code References...",
                                       command=self.find_references)
 
@@ -22,11 +24,11 @@ class ClassViewer(ttk.Treeview):
 
     def popup(self, event):
         try:
-            self.context_menu.tk_popup(event.x_root+73, event.y_root+10, 0)
+            self.context_menu.tk_popup(event.x_root + 73, event.y_root + 10, 0)
         finally:
             self.context_menu.grab_release()
 
-    #this code is illegal dont even
+    # this code is illegal dont even
     def copy_pe_to_classviewer(self, pe, mode):
         if(type(pe) != pefile.PE):
             return
@@ -40,7 +42,6 @@ class ClassViewer(ttk.Treeview):
             text += ' | '.join(self.item(i, 'values'))
             text += "\n"
         return text
-
 
     def copy_selected(self):
         self.clipboard_clear()
@@ -59,12 +60,15 @@ class ClassViewer(ttk.Treeview):
         vftable_va = item_values[2]
         scanner = code_reference.ClassRefScanner(self.pe, self.mode)
         references = scanner.get_class_references(vftable_va)
+        if references == None:
+            return
         if len(references) != 0:
             self.clipboard_clear()
             text = ""
             for reference in references:
-                text+= hex(reference[0]) + " " + reference[1] + " " + reference[2]
-                text+= " ; " + item_values[3] + "\n"
+                text += hex(reference[0]) + " " + \
+                    reference[1] + " " + reference[2]
+                text += " ; " + item_values[3] + "\n"
             self.clipboard_append(text)
 
     def sort_column(self, tv, col, reverse):
@@ -76,7 +80,7 @@ class ClassViewer(ttk.Treeview):
             tv.move(k, '', index)
 
         # reverse sort next time
-        tv.heading(col, command=lambda: \
+        tv.heading(col, command=lambda:
                    self.sort_column(tv, col, not reverse))
 
 
@@ -106,12 +110,12 @@ class PyClassInformer(tk.Frame):
 
         # classlist control
         self.classlist = ClassViewer(self.root,
-                                      yscrollcommand=self.yscrollbar.set,
-                                      xscrollcommand=self.xscrollbar.set)
-        self.classlist['columns'] = ('#1','#2','#3','#4')
+                                     yscrollcommand=self.yscrollbar.set,
+                                     xscrollcommand=self.xscrollbar.set)
+        self.classlist['columns'] = ('#1', '#2', '#3', '#4')
         for col in self.classlist['columns']:
-            self.classlist.heading(col, text=col, command=lambda _col=col: \
-                     self.classlist.sort_column(self.classlist, _col, True))
+            self.classlist.heading(col, text=col, command=lambda _col=col:
+                                   self.classlist.sort_column(self.classlist, _col, True))
 
         self.classlist.heading("#0", text="ID", anchor=tk.W)
         self.classlist.heading("#1", text="VFTable Offset", anchor=tk.W)
@@ -140,7 +144,8 @@ class PyClassInformer(tk.Frame):
         self.lbl_file['text'] = "Loading: " + ntpath.basename(self.file_path)
         self.update_idletasks()
         self.scanner = rtti.RTTIScanner(self.file_path)
-        self.classlist.copy_pe_to_classviewer(self.scanner.pe, self.scanner.mode)
+        self.classlist.copy_pe_to_classviewer(
+            self.scanner.pe, self.scanner.mode)
         self.scanner.scan()
         if not self.scanner.rtti_found:
             self.lbl_file['text'] = "Error - No RTTI Found"
@@ -149,14 +154,15 @@ class PyClassInformer(tk.Frame):
             self.classlist.insert("", i,
                                   text=str(i),
                                   values=(self.scanner.vftables_offset[i],
-                                    self.scanner.vftables_rva[i],
-                                    self.scanner.vftables_va[i],
-                                    self.scanner.symbols[i]))
+                                          self.scanner.vftables_rva[i],
+                                          self.scanner.vftables_va[i],
+                                          self.scanner.symbols[i]))
         self.lbl_file['text'] = ntpath.basename(self.file_path)
         self.lbl_file['text'] += " | " + str(self.scanner.mode) + 'bit'
-        self.lbl_file['text'] += " | ObjectLocators found: " + str(len(self.scanner.objectLocators))
-        self.lbl_file['text'] += " | Classes found: " + str(len(self.scanner.vftables_va))
-
+        self.lbl_file['text'] += " | ObjectLocators found: " + \
+            str(len(self.scanner.objectLocators))
+        self.lbl_file['text'] += " | Classes found: " + \
+            str(len(self.scanner.vftables_va))
 
     def exportData(self):
         save_file_path = filedialog.asksaveasfilename()
@@ -169,8 +175,6 @@ class PyClassInformer(tk.Frame):
                 file.close()
         finally:
             return
-
-
 
 
 def main():
