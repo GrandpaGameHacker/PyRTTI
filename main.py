@@ -137,7 +137,7 @@ class PyClassInformer(tk.Frame):
     def loadFile(self):
         self.classlist.delete(*self.classlist.get_children())
         self.file_path = filedialog.askopenfilename(
-            filetypes=(("Executable files", "*.exe"),
+            filetypes=(("Executable files", "*.exe *.dll"),
                        ("DLL Library", "*.dll"), ("all files", "*.*")))
         if self.file_path == '':
             return
