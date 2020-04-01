@@ -58,13 +58,9 @@ class ClassRefScanner:
         vftable_offset = int(vftable_offset, 16)
         for offset in offsets:
             for (address, size, mnemonic, op_str) in self.disasm_code(offset, LEA64_MAX_SIZE):
-                #print((hex(offset),size, mnemonic, op_str))
                 if op_str.find('rip +') != -1:
-                    #add rip+n + section offset + instruction size
                     op_offset = int(op_str[op_str.find("[rip"):].strip('[]').split(' + ')[1], 16)
                     op_offset += size + self.section_offset//2 + offset
-                    #print(hex(offset), mnemonic, op_str)
-                    #print(hex(op_offset), hex(vftable_offset))
                     if op_offset == vftable_offset:
                         rva = self.pe.get_rva_from_offset(
                         offset + self.section_offset)
