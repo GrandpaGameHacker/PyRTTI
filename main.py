@@ -57,9 +57,12 @@ class ClassViewer(ttk.Treeview):
             return
         item = self.selection()[0]
         item_values = self.item(item, 'values')
-        vftable_va = item_values[2]
+        if self.mode == 32:
+            vftable = item_values[2]
+        elif self.mode == 64:
+            vftable = item_values[0]
         scanner = code_reference.ClassRefScanner(self.pe, self.mode)
-        references = scanner.get_class_references(vftable_va)
+        references = scanner.get_class_references(vftable)
         if references == None:
             return
         if len(references) != 0:

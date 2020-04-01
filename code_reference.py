@@ -26,7 +26,7 @@ class ClassRefScanner:
                 self.section_offset = section.PointerToRawData
 
     def find_bytes(self, bytes):
-        index = 1
+        index = 0
         results = []
         while index != -1:
             index = self.code_bytes.find(bytes, index)
@@ -52,27 +52,31 @@ class ClassRefScanner:
                     print((hex(rva),size, mnemonic, op_str))
         return references
 
-    # vftables in 64bit are commonly accessed with instruction LEA
-    # Okay, so LEA64 is rip-relative addressed like
-    # lea, rcx, [rip + 0x3600d]
-    # that means we need to check if it adds or subtracts
-    # then do the same to the rip of the instruction
-    # to get the actual address, and then we compare that to vftable
-    # if it mactches, log!
-    def get_references_64(self, vftable_va):
+    def get_references_64(self, vftable_offset):
+        references = []
         offsets = self.find_bytes(LEA64_START_BYTES)
+        vftable_offset = int(vftable_offset, 16)
         for offset in offsets:
             for (address, size, mnemonic, op_str) in self.disasm_code(offset, LEA64_MAX_SIZE):
-                rva = self.pe.get_rva_from_offset(offset + self.section_offset)
-                print((hex(rva),size, mnemonic, op_str))
-                if op_str.find(vftable_va) != -1:
-                    references.append((rva, mnemonic, op_str))
+                #print((hex(offset),size, mnemonic, op_str))
+                if op_str.find('rip +') != -1:
+                    #add rip+n + section offset + instruction size
+                    op_offset = int(op_str[op_str.find("[rip"):].strip('[]').split(' + ')[1], 16)
+                    op_offset += size + self.section_offset//2 + offset
+                    #print(hex(offset), mnemonic, op_str)
+                    #print(hex(op_offset), hex(vftable_offset))
+                    if op_offset == vftable_offset:
+                        rva = self.pe.get_rva_from_offset(
+                        offset + self.section_offset)
+                        references.append((rva, mnemonic, op_str))
+                        print(hex(rva), mnemonic, op_str)
+        return references
 
     def get_class_references(self, vftable_va):
         if self.mode == 32:
-            return self.get_references_32(vftable_va)
+            references = self.get_references_32(vftable_va)
         elif self.mode == 64:
-            return self.get_references_64(vftable_va)
+            references = self.get_references_64(vftable_va)
 
 
         print("found", len(references), "references")

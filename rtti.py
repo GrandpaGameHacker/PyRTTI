@@ -172,6 +172,8 @@ class RTTIScanner:
         specialByte_str = specialByte.to_bytes(1, 'little')
         specialByte_str2 = specialByte2.to_bytes(1, 'little')
         
+        self.pe.get_seself.data.find(b'.?AVtype_info@@')
+
         objectRegex = b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00...[\xf0-\xff]...[\xf0-\xff]\x00\x00\x00\x00'
         objectRegex = objectRegex.replace(b'\xf0', specialByte_str)
         objectRegex = objectRegex.replace(b'\xff', specialByte_str2)
